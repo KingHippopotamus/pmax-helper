@@ -49,8 +49,18 @@ class ImageScraper:
 
     def _extract_character(self, soup: BeautifulSoup) -> Optional[str]:
         """キャラクター画像のURLを抽出"""
-        selector = '.wonder-cv .wonder-cv-wrapper .wonder-cv-back-person-img'
-        element = soup.select_one(selector)
+        # 複数のセレクターパターンを試す
+        selectors = [
+            '.wonder-cv .wonder-cv-wrapper .wonder-cv-back-person-img',  # 元のセレクター
+            '.wonder-cv-back-person-img',  # クラス名のみ
+            'img.wonder-cv-back-person-img',  # imgタグに限定
+        ]
+
+        element = None
+        for selector in selectors:
+            element = soup.select_one(selector)
+            if element:
+                break
 
         if not element:
             return None
