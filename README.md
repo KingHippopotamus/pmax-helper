@@ -1,33 +1,51 @@
 # Pmax Helper - AI Video Generator
 
-Webページからヘッダーロゴとキャラクター画像を抽出し、AI（fal-ai/sora-2）を使って動画を生成するツールです。
+LP URLを入力するだけで、AIがキャラクター動画を自動生成します。
+
+## 🚀 クイックスタート（Google Colab - 推奨）
+
+**環境構築不要！ブラウザだけで動画生成**
+
+1. Google Colabでノートブックを開く:
+   👉 https://colab.research.google.com/github/KingHippopotamus/pmax-helper/blob/main/pmax_helper_simple.ipynb
+
+2. APIキーを設定（左サイドバーの🔑アイコン）:
+   - `FAL_KEY`: fal.ai APIキー ([取得](https://fal.ai/dashboard))
+   - `LAMBDA_SECRET_KEY`: ダミー値（`dummy_key`でOK）
+
+3. セルを上から順番に実行
+
+4. LP URLを入力して「動画を生成」ボタンをクリック
+
+5. 完成した動画をダウンロード
+
+**これだけ！Python・Node.js不要です。**
+
+---
 
 ## 機能
 
-- 指定されたURLのWebページから特定の画像を抽出
-- 抽出した画像を自動的に前処理（アスペクト比調整）
-- fal-ai/sora-2 API を使用して各画像から動画を生成
-  - **ロゴ画像**: エフェクト付きのカッコいいアニメーション
-  - **キャラクター画像**: ダンスアニメーション
-- 生成された動画をWebブラウザでプレビュー
-- ZIPファイルで一括ダウンロード
+- LP URLからページ情報を自動分析（Gemini API）
+- キャラクター画像を自動抽出
+- 商材情報に基づいて動画生成プロンプトを自動作成
+- fal-ai/sora-2で高品質な動画を生成
+- Google Colab内で動画をプレビュー・ダウンロード
 
 ## 技術スタック
 
-### バックエンド
 - Python 3.x
-- Flask (Web API)
 - BeautifulSoup4 (HTMLパース)
 - Pillow (画像処理)
 - fal-client (AI動画生成)
+- ipywidgets (Colab UI)
 
-### フロントエンド
-- React 18
-- TypeScript
-- Vite
-- Axios
+---
 
-## セットアップ
+## ローカル環境での起動（上級者向け）
+
+環境構築が可能な方は、ローカルでReact + Flaskのフル機能版も利用できます。
+
+### セットアップ
 
 ### 1. リポジトリのクローン
 
@@ -279,59 +297,15 @@ pmax_helper/
 
 ---
 
-## Google Colabでの起動方法（推奨）
+## Google Colab + React フロントエンド版（上級者向け）
 
-Python環境の構築が不要で、誰でも簡単に起動できます。
+Reactフロントエンドを使いたい場合は、以下のノートブックを使用してください:
 
-### 起動手順
+👉 https://colab.research.google.com/github/KingHippopotamus/pmax-helper/blob/main/pmax_helper_with_frontend.ipynb
 
-1. **Colabでノートブックを開く**
-   - 直接リンク: https://colab.research.google.com/github/KingHippopotamus/pmax-helper/blob/main/pmax_helper_colab.ipynb
-   - または Google Colab で「GitHub」タブから `KingHippopotamus/pmax-helper` を検索
+**必要なもの:**
+- fal.ai APIキー
+- ngrok認証トークン
+- ローカルでNode.js環境（フロントエンド起動用）
 
-2. **API KEYを設定（Google Colab Secrets機能を使用）**
-   - 左サイドバーの **🔑 鍵アイコン（Secrets）** をクリック
-   - 以下の3つのシークレットを追加:
-     - **名前**: `FAL_KEY` → **値**: あなたのfal.ai APIキー
-     - **名前**: `LAMBDA_SECRET_KEY` → **値**: ダミー値（例: `dummy_key`）
-     - **名前**: `NGROK_AUTH_TOKEN` → **値**: あなたのngrok認証トークン
-   - 各シークレットの「ノートブックからアクセスを許可」をONにする
-
-   ⚠️ **重要**: Secrets機能を使うことで、APIキーがノートブックに露出せず安全です
-
-   **ngrok認証トークンの取得方法:**
-   1. https://dashboard.ngrok.com/signup にアクセス
-   2. 無料アカウントを作成（GoogleアカウントでOK）
-   3. https://dashboard.ngrok.com/get-started/your-authtoken から認証トークンをコピー
-
-3. **セルを順番に実行**
-   - 上から順番にすべてのセルを実行
-   - ngrok URLが表示されます（例: `https://xxxx.ngrok-free.app`）
-
-4. **フロントエンドを起動**
-   - ローカル環境で以下を実行:
-   ```bash
-   cd frontend
-   echo 'VITE_API_URL=https://xxxx.ngrok-free.app' > .env.local
-   npm run dev
-   ```
-   - ブラウザで `http://localhost:3000` を開く
-
-### 注意事項
-
-- **セッションタイムアウト**: 90分無操作で切断、最大12時間
-- **ngrok URLの変更**: 再起動のたびにURLが変わるため、フロントエンドの `.env.local` を更新してください
-- **無料枠**: Google Colabの無料枠で十分動作します
-
-### トラブルシューティング
-
-#### セッションが切れた
-- ノートブックを最初から再実行
-- 新しいngrok URLをフロントエンドに設定
-
-#### CORS エラー
-- バックエンドが正しく起動しているか確認
-- ngrok URLが正しく設定されているか確認
-
-#### パッケージインストールエラー
-- Colabを再起動して最初からやり直す
+**⚠️ 初心者の方は上記の「クイックスタート」を推奨します。**
