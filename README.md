@@ -283,20 +283,20 @@ pmax_helper/
 
 Python環境の構築が不要で、誰でも簡単に起動できます。
 
-### 準備
-
-1. Google Colabにアクセス: https://colab.research.google.com/
-2. `pmax_helper_colab.ipynb` をアップロード
-3. GitHubリポジトリURLを取得（またはファイルをアップロード）
-
 ### 起動手順
 
 1. **Colabでノートブックを開く**
-   - `pmax_helper_colab.ipynb` を開く
+   - 直接リンク: https://colab.research.google.com/github/KingHippopotamus/pmax-helper/blob/main/pmax_helper_colab.ipynb
+   - または Google Colab で「GitHub」タブから `KingHippopotamus/pmax-helper` を検索
 
-2. **API KEYを設定**
-   - セル1の `FAL_KEY` と `LAMBDA_SECRET_KEY` を設定
-   - ⚠️ **重要**: 実際のAPI KEYに置き換えてください
+2. **API KEYを設定（Google Colab Secrets機能を使用）**
+   - 左サイドバーの **🔑 鍵アイコン（Secrets）** をクリック
+   - 以下の2つのシークレットを追加:
+     - **名前**: `FAL_KEY` → **値**: あなたのfal.ai APIキー
+     - **名前**: `LAMBDA_SECRET_KEY` → **値**: あなたのGemini APIキー
+   - 各シークレットの「ノートブックからアクセスを許可」をONにする
+
+   ⚠️ **重要**: Secrets機能を使うことで、APIキーがノートブックに露出せず安全です
 
 3. **セルを順番に実行**
    - 上から順番にすべてのセルを実行
