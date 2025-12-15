@@ -291,12 +291,18 @@ Python環境の構築が不要で、誰でも簡単に起動できます。
 
 2. **API KEYを設定（Google Colab Secrets機能を使用）**
    - 左サイドバーの **🔑 鍵アイコン（Secrets）** をクリック
-   - 以下の2つのシークレットを追加:
+   - 以下の3つのシークレットを追加:
      - **名前**: `FAL_KEY` → **値**: あなたのfal.ai APIキー
-     - **名前**: `LAMBDA_SECRET_KEY` → **値**: あなたのGemini APIキー
+     - **名前**: `LAMBDA_SECRET_KEY` → **値**: ダミー値（例: `dummy_key`）
+     - **名前**: `NGROK_AUTH_TOKEN` → **値**: あなたのngrok認証トークン
    - 各シークレットの「ノートブックからアクセスを許可」をONにする
 
    ⚠️ **重要**: Secrets機能を使うことで、APIキーがノートブックに露出せず安全です
+
+   **ngrok認証トークンの取得方法:**
+   1. https://dashboard.ngrok.com/signup にアクセス
+   2. 無料アカウントを作成（GoogleアカウントでOK）
+   3. https://dashboard.ngrok.com/get-started/your-authtoken から認証トークンをコピー
 
 3. **セルを順番に実行**
    - 上から順番にすべてのセルを実行
