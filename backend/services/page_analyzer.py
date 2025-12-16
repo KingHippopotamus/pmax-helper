@@ -93,6 +93,14 @@ CTAテキスト: [CTAテキスト]
             # プロンプトを生成
             generated_prompt = self._generate_video_prompt(product_info)
 
+            # キャラクター画像を抽出
+            print("\n🖼️ キャラクター画像を抽出中...")
+            from .scraper import ImageScraper
+            scraper = ImageScraper(url)
+            images = scraper.extract_images()
+            character_image_url = images.get('character_url', '')
+            print(f"✅ キャラクター画像URL: {character_image_url}")
+
             return {
                 'product_name': product_info.get('product_name', ''),
                 'target_audience': product_info.get('target_audience', ''),

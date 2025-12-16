@@ -57,29 +57,50 @@ class ImageScraper:
         ]
 
         element = None
+        matched_selector = None
         for selector in selectors:
+            print(f"🔍 セレクター試行: {selector}")
             element = soup.select_one(selector)
             if element:
+                matched_selector = selector
+                print(f"✅ マッチしました: {selector}")
+                print(f"   要素タグ: {element.name}")
+                print(f"   クラス: {element.get('class', [])}")
                 break
+            else:
+                print(f"❌ マッチせず: {selector}")
 
         if not element:
+            print("❌ すべてのセレクターでマッチせず")
+            # デバッグ: wonder-cv-back-person-img を含むすべての要素を検索
+            all_matches = soup.find_all(class_=lambda x: x and 'wonder-cv-back-person-img' in x)
+            print(f"🔍 'wonder-cv-back-person-img' を含む要素数: {len(all_matches)}")
+            for idx, el in enumerate(all_matches[:3]):  # 最初の3つだけ表示
+                print(f"   [{idx}] タグ: {el.name}, クラス: {el.get('class', [])}, src: {el.get('src', 'なし')[:50]}")
             return None
 
         # 要素自体が img タグの場合（最優先）
         if element.name == 'img' and element.get('src'):
-            return urljoin(self.url, element['src'])
+            src = element.get('src')
+            print(f"✅ imgタグのsrc属性から取得: {src[:100]}")
+            return urljoin(self.url, src)
 
         # background-image から URL を抽出
         style = element.get('style', '')
         match = re.search(r'url\(["\']?([^"\']+)["\']?\)', style)
         if match:
-            return urljoin(self.url, match.group(1))
+            url = match.group(1)
+            print(f"✅ background-imageから取得: {url[:100]}")
+            return urljoin(self.url, url)
 
         # または子要素の img タグを探す
         img_element = element.find('img')
         if img_element and img_element.get('src'):
-            return urljoin(self.url, img_element['src'])
+            src = img_element.get('src')
+            print(f"✅ 子要素のimgタグから取得: {src[:100]}")
+            return urljoin(self.url, src)
 
+        print("❌ 画像URLを抽出できませんでした")
         return None
 
     def download_image(self, image_url: str) -> bytes:
