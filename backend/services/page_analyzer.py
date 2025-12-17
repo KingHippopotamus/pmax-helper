@@ -111,7 +111,8 @@ CTAテキスト: [CTAテキスト]
                 'cta_text': product_info.get('cta_text', ''),
                 'generated_prompt': generated_prompt,
                 'raw_analysis': analysis_text,
-                'page_url': url  # URLを追加して、画像抽出で使用できるようにする
+                'page_url': url,  # URLを追加して、画像抽出で使用できるようにする
+                'character_image_url': character_image_url  # キャラクター画像URLを追加
             }
 
         except Exception as e:
