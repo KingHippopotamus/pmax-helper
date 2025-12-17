@@ -54,3 +54,7 @@ debug.log
 *.mp4
 *.zip
 temp/
+
+# Shared key notebooks with actual API keys
+# (Keep the template, but ignore customized versions)
+pmax_helper_shared_key_*.ipynb
