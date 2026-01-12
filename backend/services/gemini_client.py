@@ -52,20 +52,39 @@ class GeminiClient:
                 "prompt": prompt
             }
 
-            # モデル名が指定されている場合は追加
+            # モデル名が指定されている場合は追加（デフォルトで含めるように変更）
             if model:
                 payload["model"] = model
+            else:
+                # デフォルトモデルを含める（JavaScriptと同じ動作に）
+                payload["model"] = self.DEFAULT_MODEL
+
+            # 明示的にヘッダーを設定（JavaScriptと同じように）
+            headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (compatible; PMaxHelper/1.0)'  # ブラウザのようなUser-Agent
+            }
 
             logger.info(f"📡 Calling Gemini Lambda API...")
-            logger.debug(f"Model: {model or self.DEFAULT_MODEL}")
+            logger.debug(f"Request URL: {self.LAMBDA_URL}")
+            logger.debug(f"Request method: POST")
+            logger.debug(f"Request headers: {headers}")
+            logger.debug(f"Model: {payload.get('model')}")
             logger.debug(f"Prompt length: {len(prompt)} characters")
+            logger.debug(f"Payload: {payload}")
 
             # HTTPリクエストを送信
             response = requests.post(
                 self.LAMBDA_URL,
                 json=payload,
+                headers=headers,  # ヘッダーを明示的に指定
                 timeout=self.TIMEOUT
             )
+
+            # レスポンスの詳細をログに出力
+            logger.debug(f"Response status code: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.headers)}")
+            logger.debug(f"Response body (first 500 chars): {response.text[:500]}")
 
             # HTTPエラーをチェック
             response.raise_for_status()
@@ -89,6 +108,15 @@ class GeminiClient:
         except requests.exceptions.RequestException as e:
             error_msg = f"Gemini API request failed: {str(e)}"
             logger.error(f"❌ {error_msg}")
+            logger.error(f"Request URL: {self.LAMBDA_URL}")
+            logger.error(f"Request method: POST")
+            logger.error(f"Request headers: {headers if 'headers' in locals() else 'N/A'}")
+
+            # レスポンスが存在する場合は詳細を出力
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status code: {e.response.status_code}")
+                logger.error(f"Response headers: {dict(e.response.headers)}")
+                logger.error(f"Response body: {e.response.text[:1000]}")  # 最初の1000文字
             raise Exception(error_msg)
 
         except Exception as e:

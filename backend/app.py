@@ -10,6 +10,7 @@ from services.scraper import ImageScraper
 from services.image_processor import ImageProcessor
 from services.video_generator import VideoGenerator
 from services.page_analyzer import PageAnalyzer
+from services.exceptions import ContentPolicyViolationError
 
 # 環境変数をロード（システム環境変数をオーバーライド）
 load_dotenv(override=True)
@@ -173,6 +174,20 @@ def generate_videos():
 
             logger.info(f"🎉 Video generation complete")
             return jsonify(video_result), 200
+
+        except ContentPolicyViolationError as e:
+            logger.error(f"❌ Content policy violation: {str(e)}")
+            return jsonify({
+                'error': str(e),
+                'error_type': 'content_policy_violation',
+                'suggestions': [
+                    '画像の背景をシンプルにする',
+                    '明るい照明の画像を使用する',
+                    'キャラクターの全身が写っている画像を避ける',
+                    'ロゴやイラストなど、人物以外の画像を試す'
+                ]
+            }), 400
+
         except Exception as e:
             logger.error(f"❌ Character video generation failed: {str(e)}", exc_info=True)
             return jsonify({'error': str(e)}), 500
