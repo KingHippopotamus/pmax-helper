@@ -1,8 +1,12 @@
 import fal_client
 import os
 import requests
+import logging
 from typing import Dict, Optional
 from io import BytesIO
+from .exceptions import ContentPolicyViolationError, VideoGenerationError
+
+logger = logging.getLogger(__name__)
 
 class VideoGenerator:
     """fal-ai を使用して画像から動画を生成するクラス"""
@@ -67,7 +71,28 @@ class VideoGenerator:
             }
 
         except Exception as e:
-            raise Exception(f"Failed to generate video: {str(e)}")
+            error_message = str(e).lower()
+
+            # Content policy violationエラーを検出
+            if any(keyword in error_message for keyword in [
+                'content policy',
+                'policy violation',
+                'nsfw',
+                'not safe for work',
+                'inappropriate content',
+                'safety filter',
+                'safety system'
+            ]):
+                logger.error(f"❌ Content policy violation detected: {str(e)}")
+                raise ContentPolicyViolationError(
+                    "動画生成がコンテンツポリシー違反により拒否されました。"
+                    "人物画像の場合、服装や背景が原因の可能性があります。"
+                    "より一般的な画像を使用するか、別の画像をお試しください。"
+                )
+
+            # その他のエラー
+            logger.error(f"❌ Video generation failed: {str(e)}")
+            raise VideoGenerationError(f"Failed to generate video: {str(e)}")
 
     def _upload_image(self, image_data: bytes) -> str:
         """
