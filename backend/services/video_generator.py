@@ -45,8 +45,11 @@ class VideoGenerator:
 
             # fal-ai/sora-2/image-to-video を呼び出し
             # FAL_KEY は環境変数から fal_client が自動的に読み込む
+            model_name = "fal-ai/sora-2/image-to-video/pro"
+            print(f"🎯 使用モデル: {model_name}")
+
             result = fal_client.subscribe(
-                "fal-ai/sora-2/image-to-video/pro",
+                model_name,
                 arguments={
                     "image_url": image_url,
                     "prompt": prompt,
