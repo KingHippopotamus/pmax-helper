@@ -21,7 +21,7 @@ print(f"Image URL: {test_image_url}")
 
 try:
     result = fal_client.subscribe(
-        "fal-ai/sora-2/image-to-video",
+        "fal-ai/sora-2/image-to-video/pro",
         arguments={
             "image_url": test_image_url,
             "prompt": "Test animation",
