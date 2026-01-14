@@ -23,7 +23,8 @@ class VideoGenerator:
         self,
         image_data: bytes,
         prompt: str,
-        duration: int = 4
+        duration: int = 4,
+        aspect_ratio: str = "16:9"
     ) -> Dict[str, any]:
         """
         画像から動画を生成 (Sora 2使用)
@@ -32,6 +33,7 @@ class VideoGenerator:
             image_data: 入力画像のバイトデータ
             prompt: 動画生成のプロンプト（必須）
             duration: 動画の長さ（4, 8, または 12秒）
+            aspect_ratio: アスペクト比（"16:9" または "9:16"）
 
         Returns:
             {
@@ -55,7 +57,7 @@ class VideoGenerator:
                     "prompt": prompt,
                     "duration": duration,
                     "resolution": "auto",
-                    "aspect_ratio": "auto"
+                    "aspect_ratio": aspect_ratio
                 },
                 with_logs=True
             )
@@ -150,17 +152,18 @@ class VideoGenerator:
         prompt = "Animate this logo with cool, dynamic effects while keeping the core design intact. Add subtle lighting changes, particle effects, or a sleek reveal."
         return self.generate_video_from_image(image_data, prompt=prompt, duration=4)
 
-    def generate_character_video(self, image_data: bytes, prompt: Optional[str] = None) -> Dict[str, any]:
+    def generate_character_video(self, image_data: bytes, prompt: Optional[str] = None, aspect_ratio: str = "16:9") -> Dict[str, any]:
         """
         キャラクター用の動画を生成
 
         Args:
             image_data: キャラクター画像のバイトデータ
             prompt: カスタムプロンプト（未指定の場合はデフォルト使用）
+            aspect_ratio: アスペクト比（"16:9" または "9:16"）
 
         Returns:
             動画生成結果
         """
         if not prompt:
             prompt = "Make this character dance with lively and fun movements. Add energetic body language and natural motion."
-        return self.generate_video_from_image(image_data, prompt=prompt, duration=12)
+        return self.generate_video_from_image(image_data, prompt=prompt, duration=12, aspect_ratio=aspect_ratio)
