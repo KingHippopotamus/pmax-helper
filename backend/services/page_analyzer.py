@@ -143,116 +143,34 @@ CTAテキスト: [CTAテキスト]
 
     def _generate_video_prompt(self, product_info: Dict[str, str], aspect_ratio: str = "16:9") -> str:
         """
-        商材情報を基に動画生成プロンプトを生成
+        商材情報を基に動画生成プロンプトを生成（英語・簡潔版）
 
         Args:
             product_info: 商材情報（7つの要素）
             aspect_ratio: アスペクト比（"16:9", "9:16", "1:1"）
 
         Returns:
-            動画生成用のプロンプト
+            動画生成用のプロンプト（英語・シンプル化）
         """
-        product_name = product_info.get('product_name', '[商材/ブランド名]')
-        target = product_info.get('target_audience', '[メインターゲット]')
-        catchphrase = product_info.get('catchphrase', '[キャッチコピー]')
-        benefit1 = product_info.get('benefit1', '[ベネフィット1]')
-        benefit2 = product_info.get('benefit2', '[ベネフィット2]')
-        offer = product_info.get('offer', '[オファー]')
-        cta_text = product_info.get('cta_text', '[CTAテキスト]')
+        # ターゲット情報のみ使用（ポリシー違反リスク低減のため、商材名やキャッチコピーは除外）
+        target = product_info.get('target_audience', 'customers')
 
-        # 1:1用の追加指示
-        square_instruction = ""
-        if aspect_ratio == "1:1":
-            square_instruction = """
-【重要: 正方形描画指示】
-描画領域は1:1の正方形で、まず描画領域を定義し、上下を黒く塗りつぶして。描画領域にのみ描画して。テキスト、キャラクターが画面の中央に全て収まるようにして。
-"""
+        # シンプルな英語プロンプト（コンテンツポリシー違反を避けるため大幅に簡素化）
+        prompt = f"""Create a dynamic 12-second advertisement video with the character from the input image.
 
-        prompt = f"""汎用P-MAX広告動画 生成プロンプト（12秒・キャラクター画像1点入力）
-【目的】 Google P-MAX広告枠（YouTube Shorts, Discover等）向けに、無音再生でもターゲットの注意を引き、行動を喚起する12秒の動画を生成する。
+Video concept: An engaging promotional video showcasing a product/service for {target}.
 
-【提供アセット（必須）】
+Visual style: Modern, bright, and professional with smooth animations.
 
-キャラクター画像（背景透過推奨）
-{square_instruction}
-【ユーザー入力（URL分析結果）】
+Character animation: Make the character move naturally - waving, jumping, or gesturing enthusiastically to grab attention.
 
-[商材/ブランド名]：{product_name}
+Text overlays: Display clear, bold text for key messages in an eye-catching way.
 
-[メインターゲット]：{target}
+Background: Use vibrant colors and abstract animated shapes that complement the character.
 
-[キャッチコピー]：{catchphrase}
+Pacing: Fast-paced with dynamic transitions between scenes.
 
-[ベネフィット1]：{benefit1}
-
-[ベネフィット2]：{benefit2}
-
-[オファー（任意）]：{offer}
-
-[CTAテキスト]：{cta_text}
-
-【AIへの動画生成シーケンス指示】
-
-全体のトーン＆マナー: モダン、スピーディー、信頼感。BGMはアップテンポなインストルメンタルのみで、音声・ナレーション・テキスト読み上げは一切含めないこと。
-
-テキスト表示の重要な注意事項:
-- すべてのテキスト（テロップ）は、太字の明瞭なゴシック体フォントを使用すること
-- テキストは完全に読みやすく、クリアにレンダリングすること
-- 文字が歪んだり、崩れたり、不鮮明になることは絶対に避けること
-- テキストと背景の間に強いコントラストを持たせ、常に読みやすい状態を保つこと
-
-▼ シーケンス 1：掴み (0-3秒)
-
-映像:
-
-提供されたキャラクター画像を入力画像として使用する。
-
-このキャラクターに、{target} に向かって手を振ったり、元気にジャンプして登場するようなアニメーション（動き）をつける。
-
-背景はブランドカラーをベースにした明るくダイナミックな抽象アニメーション。
-
-テロップ (特大): {catchphrase}
-
-▼ シーケンス 2：ベネフィット 1 (4-6秒)
-
-映像:
-
-キャラクターは画面の隅（例：左下）に移動し、案内役として頷いたり、指をさしたりするリアクションをとる。
-
-画面中央に {benefit1} を象徴するシンプルなアイコン（例：歯車、チェックマーク、書類アイコン）がポップアップ表示される。
-
-テロップ (大・中央): {benefit1}
-
-▼ シーケンス 3：ベネフィット 2 / オファー (7-9秒)
-
-映像:
-
-中央のアイコンとテキストが、{benefit2} または {offer} の内容に素早く切り替わる。（例：グラフアイコン、カレンダーアイコン）
-
-キャラクターは驚きや喜びの表情のアニメーションをとる。
-
-テロップ (大・中央): {benefit2} または {offer}
-
-▼ シーケンス 4：CTAとブランド提示 (10-12秒)
-
-映像:
-
-画面全体が白またはブランドカラーのクリーンな背景に切り替わる。（キャラクターはここで消えても良い）
-
-中央にテキストで {product_name} をロゴのように大きく表示する。（フォントは太く、信頼感のあるもの）
-
-その下に、行動喚起のボタン風デザインを配置する。
-
-テロップ (ボタン内・特大): {cta_text}
-
-テロップ (画面下部・小): {product_name} で検索
-
-共通事項:
-- すべてのテキストは最前面に配置し、背景と十分なコントラストを持たせること。
-- テキストは完全に読みやすく、文字が崩れない鮮明な表示を維持すること。
-- テキストのフォントサイズは十分に大きく、太字で明瞭にすること。
-- 音声・ナレーション・テキスト読み上げは一切使用せず、BGMのみとすること。
-"""
+Overall mood: Energetic, positive, and trustworthy."""
 
         return prompt
 

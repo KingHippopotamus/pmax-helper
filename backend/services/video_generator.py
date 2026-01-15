@@ -76,28 +76,82 @@ class VideoGenerator:
             }
 
         except Exception as e:
-            error_message = str(e).lower()
+            # fal.aiエラーをパース
+            parsed_error = self._parse_fal_error(e)
+            error_type = parsed_error['type']
+            error_msg = parsed_error['msg']
 
-            # Content policy violationエラーを検出
-            if any(keyword in error_message for keyword in [
-                'content policy',
-                'policy violation',
-                'nsfw',
-                'not safe for work',
-                'inappropriate content',
-                'safety filter',
-                'safety system'
-            ]):
-                logger.error(f"❌ Content policy violation detected: {str(e)}")
+            # エラータイプ別にハンドリング
+            if error_type == 'content_policy_violation':
+                logger.error(f"❌ Content policy violation detected: {error_msg}")
                 raise ContentPolicyViolationError(
-                    "動画生成がコンテンツポリシー違反により拒否されました。"
-                    "人物画像の場合、服装や背景が原因の可能性があります。"
-                    "より一般的な画像を使用するか、別の画像をお試しください。"
+                    "動画生成がコンテンツポリシー違反により拒否されました。\n"
+                    "以下の理由が考えられます:\n"
+                    "・画像に不適切なコンテンツが含まれている可能性\n"
+                    "・プロンプトに不適切な表現が含まれている可能性\n"
+                    "・人物画像の場合、服装や背景が原因の可能性\n\n"
+                    "対処方法:\n"
+                    "・より一般的な画像を使用してください\n"
+                    "・別のキャラクター画像をお試しください\n"
+                    "・プロンプト内容を確認してください"
                 )
 
             # その他のエラー
-            logger.error(f"❌ Video generation failed: {str(e)}")
-            raise VideoGenerationError(f"Failed to generate video: {str(e)}")
+            logger.error(f"❌ Video generation failed: {error_msg}")
+            raise VideoGenerationError(f"動画生成に失敗しました: {error_msg}")
+
+    def _parse_fal_error(self, exception: Exception) -> dict:
+        """
+        fal.ai APIのエラーをパースして構造化データを取得
+
+        Args:
+            exception: fal.ai APIから返された例外
+
+        Returns:
+            {
+                'type': str,  # エラータイプ (e.g., 'content_policy_violation')
+                'msg': str,   # エラーメッセージ
+                'details': dict  # その他の詳細情報
+            }
+        """
+        import json
+
+        error_str = str(exception)
+
+        # JSON配列としてパースを試みる
+        try:
+            # "[{...}]" 形式の文字列をパース
+            if error_str.startswith('[') and error_str.endswith(']'):
+                error_list = json.loads(error_str)
+                if error_list and isinstance(error_list, list):
+                    # 最初のエラーオブジェクトを使用
+                    first_error = error_list[0]
+                    return {
+                        'type': first_error.get('type', ''),
+                        'msg': first_error.get('msg', ''),
+                        'details': first_error
+                    }
+        except (json.JSONDecodeError, KeyError, IndexError):
+            pass
+
+        # パース失敗時は文字列から推測
+        error_lower = error_str.lower()
+
+        # 'type': 'content_policy_violation' のパターンを探す
+        if 'content_policy_violation' in error_lower or \
+           ('content' in error_lower and 'policy' in error_lower):
+            return {
+                'type': 'content_policy_violation',
+                'msg': error_str,
+                'details': {}
+            }
+
+        # その他のエラー
+        return {
+            'type': 'unknown',
+            'msg': error_str,
+            'details': {}
+        }
 
     def _upload_image(self, image_data: bytes) -> str:
         """
