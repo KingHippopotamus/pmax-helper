@@ -248,6 +248,89 @@ class VideoGenerator:
                 os.unlink(input_path)
             raise Exception(f"Failed to trim video: {str(e)}")
 
+    def add_letterbox_to_square(self, video_url: str, start_time: float = 0.3) -> bytes:
+        """
+        横長動画の上下に黒い背景を追加して正方形にする
+
+        Args:
+            video_url: 動画のURL
+            start_time: 開始時間（秒）。この時間以降の動画を使用
+
+        Returns:
+            正方形動画のバイトデータ
+        """
+        import tempfile
+        import os
+        from moviepy.editor import VideoFileClip, ColorClip, CompositeVideoClip
+
+        # 動画をダウンロード
+        response = requests.get(video_url, timeout=60)
+        response.raise_for_status()
+
+        # 一時ファイルに保存
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_input:
+            tmp_input.write(response.content)
+            input_path = tmp_input.name
+
+        try:
+            # moviepyで動画を読み込み
+            clip = VideoFileClip(input_path)
+
+            # 開始時間以降を切り出し
+            if start_time > 0:
+                clip = clip.subclip(start_time)
+
+            # 動画のサイズを取得
+            width, height = clip.size
+
+            # 正方形のサイズを決定（幅に合わせる）
+            square_size = width
+
+            # 黒い背景を作成
+            background = ColorClip(
+                size=(square_size, square_size),
+                color=(0, 0, 0),
+                duration=clip.duration
+            )
+
+            # 動画を中央に配置
+            y_offset = (square_size - height) // 2
+            clip = clip.set_position(('center', y_offset))
+
+            # 背景と動画を合成
+            final_clip = CompositeVideoClip([background, clip])
+
+            # 一時ファイルに書き出し
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_output:
+                output_path = tmp_output.name
+
+            final_clip.write_videofile(
+                output_path,
+                codec='libx264',
+                audio_codec='aac',
+                temp_audiofile=tempfile.mktemp(suffix='.m4a'),
+                remove_temp=True,
+                logger=None
+            )
+
+            # 処理後の動画を読み込み
+            with open(output_path, 'rb') as f:
+                video_data = f.read()
+
+            # クリーンアップ
+            clip.close()
+            final_clip.close()
+            background.close()
+            os.unlink(input_path)
+            os.unlink(output_path)
+
+            return video_data
+
+        except Exception as e:
+            if os.path.exists(input_path):
+                os.unlink(input_path)
+            raise Exception(f"Failed to add letterbox: {str(e)}")
+
     def download_video(self, video_url: str) -> bytes:
         """
         生成された動画をダウンロード
@@ -293,8 +376,8 @@ class VideoGenerator:
         if not prompt:
             prompt = "Make this character dance with lively and fun movements. Add energetic body language and natural motion."
 
-        # 1:1の場合は9:16で生成
-        actual_ratio = "9:16" if aspect_ratio == "1:1" else aspect_ratio
+        # 1:1の場合も16:9で生成（変更点）
+        actual_ratio = aspect_ratio if aspect_ratio != "1:1" else "16:9"
 
         # 動画生成
         result = self.generate_video_from_image(
@@ -307,29 +390,39 @@ class VideoGenerator:
         if 'error' in result:
             return result
 
-        # ポストプロセス: 最初0.3秒トリミング + 1:1の場合は正方形クロップ
-        print("✂️ 動画をトリミング中...")
+        video_url = result.get('video_url')
+
+        # ポストプロセス
         try:
-            video_url = result.get('video_url')
-            square_crop = (aspect_ratio == "1:1")
-
-            if square_crop:
+            if aspect_ratio == "1:1":
+                # 1:1の場合: 横長動画の上下にレターボックスを追加
+                print("✂️ 動画を処理中...")
                 print("   - 最初0.3秒をカット")
-                print("   - 中央を正方形にクロップ")
+                print("   - 上下に黒い背景を追加して正方形に変換")
+
+                video_data = self.add_letterbox_to_square(video_url, start_time=0.3)
+
+                return {
+                    'video_data': video_data,
+                    'status': 'success',
+                    'processed': True
+                }
             else:
+                # 16:9, 9:16の場合: 最初0.3秒のみトリミング
+                print("✂️ 動画をトリミング中...")
                 print("   - 最初0.3秒をカット")
 
-            trimmed_video_data = self.trim_video(
-                video_url,
-                start_time=0.3,
-                square_crop=square_crop
-            )
+                trimmed_video_data = self.trim_video(
+                    video_url,
+                    start_time=0.3,
+                    square_crop=False
+                )
 
-            return {
-                'video_data': trimmed_video_data,
-                'status': 'success',
-                'trimmed': True
-            }
+                return {
+                    'video_data': trimmed_video_data,
+                    'status': 'success',
+                    'trimmed': True
+                }
         except Exception as e:
-            logger.error(f"❌ Video trimming failed: {str(e)}")
-            raise VideoGenerationError(f"Failed to trim video: {str(e)}")
+            logger.error(f"❌ Video post-processing failed: {str(e)}")
+            raise VideoGenerationError(f"動画の後処理に失敗しました: {str(e)}")
