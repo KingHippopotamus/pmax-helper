@@ -141,12 +141,13 @@ CTAテキスト: [CTAテキスト]
 
         return result
 
-    def _generate_video_prompt(self, product_info: Dict[str, str]) -> str:
+    def _generate_video_prompt(self, product_info: Dict[str, str], aspect_ratio: str = "16:9") -> str:
         """
         商材情報を基に動画生成プロンプトを生成
 
         Args:
             product_info: 商材情報（7つの要素）
+            aspect_ratio: アスペクト比（"16:9", "9:16", "1:1"）
 
         Returns:
             動画生成用のプロンプト
@@ -159,13 +160,21 @@ CTAテキスト: [CTAテキスト]
         offer = product_info.get('offer', '[オファー]')
         cta_text = product_info.get('cta_text', '[CTAテキスト]')
 
+        # 1:1用の追加指示
+        square_instruction = ""
+        if aspect_ratio == "1:1":
+            square_instruction = """
+【重要: 正方形描画指示】
+描画領域は1:1の正方形で、まず描画領域を定義し、上下を黒く塗りつぶして。描画領域にのみ描画して。テキスト、キャラクターが画面の中央に全て収まるようにして。
+"""
+
         prompt = f"""汎用P-MAX広告動画 生成プロンプト（12秒・キャラクター画像1点入力）
 【目的】 Google P-MAX広告枠（YouTube Shorts, Discover等）向けに、無音再生でもターゲットの注意を引き、行動を喚起する12秒の動画を生成する。
 
 【提供アセット（必須）】
 
 キャラクター画像（背景透過推奨）
-
+{square_instruction}
 【ユーザー入力（URL分析結果）】
 
 [商材/ブランド名]：{product_name}

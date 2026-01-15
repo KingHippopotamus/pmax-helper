@@ -122,6 +122,78 @@ class VideoGenerator:
             print(f"❌ Upload failed: {str(e)}")
             raise Exception(f"Failed to upload image: {str(e)}")
 
+    def trim_video(self, video_url: str, start_time: float = 0.3, square_crop: bool = False) -> bytes:
+        """
+        動画をトリミング（開始時間カット + オプションで正方形クロップ）
+
+        Args:
+            video_url: トリミングする動画のURL
+            start_time: 開始時間（秒）。この時間以降の動画を使用
+            square_crop: Trueの場合、中央を正方形にクロップ
+
+        Returns:
+            トリミング後の動画のバイトデータ
+        """
+        import tempfile
+        import os
+        from moviepy.editor import VideoFileClip
+
+        # 動画をダウンロード
+        response = requests.get(video_url, timeout=60)
+        response.raise_for_status()
+
+        # 一時ファイルに保存
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_input:
+            tmp_input.write(response.content)
+            input_path = tmp_input.name
+
+        try:
+            # moviepyで動画を読み込み
+            clip = VideoFileClip(input_path)
+
+            # 開始時間以降を切り出し
+            if start_time > 0:
+                clip = clip.subclip(start_time)
+
+            # 正方形クロップが必要な場合
+            if square_crop:
+                width, height = clip.size
+                square_size = min(width, height)
+                x_center = width / 2
+                y_center = height / 2
+                x1 = x_center - square_size / 2
+                y1 = y_center - square_size / 2
+                clip = clip.crop(x1=x1, y1=y1, width=square_size, height=square_size)
+
+            # 一時ファイルに書き出し
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_output:
+                output_path = tmp_output.name
+
+            clip.write_videofile(
+                output_path,
+                codec='libx264',
+                audio_codec='aac',
+                temp_audiofile=tempfile.mktemp(suffix='.m4a'),
+                remove_temp=True,
+                logger=None
+            )
+
+            # トリミング後の動画を読み込み
+            with open(output_path, 'rb') as f:
+                video_data = f.read()
+
+            # クリーンアップ
+            clip.close()
+            os.unlink(input_path)
+            os.unlink(output_path)
+
+            return video_data
+
+        except Exception as e:
+            if os.path.exists(input_path):
+                os.unlink(input_path)
+            raise Exception(f"Failed to trim video: {str(e)}")
+
     def download_video(self, video_url: str) -> bytes:
         """
         生成された動画をダウンロード
@@ -159,11 +231,51 @@ class VideoGenerator:
         Args:
             image_data: キャラクター画像のバイトデータ
             prompt: カスタムプロンプト（未指定の場合はデフォルト使用）
-            aspect_ratio: アスペクト比（"16:9" または "9:16"）
+            aspect_ratio: アスペクト比（"16:9", "9:16", または "1:1"）
 
         Returns:
             動画生成結果
         """
         if not prompt:
             prompt = "Make this character dance with lively and fun movements. Add energetic body language and natural motion."
-        return self.generate_video_from_image(image_data, prompt=prompt, duration=12, aspect_ratio=aspect_ratio)
+
+        # 1:1の場合は9:16で生成
+        actual_ratio = "9:16" if aspect_ratio == "1:1" else aspect_ratio
+
+        # 動画生成
+        result = self.generate_video_from_image(
+            image_data,
+            prompt=prompt,
+            duration=12,
+            aspect_ratio=actual_ratio
+        )
+
+        if 'error' in result:
+            return result
+
+        # ポストプロセス: 最初0.3秒トリミング + 1:1の場合は正方形クロップ
+        print("✂️ 動画をトリミング中...")
+        try:
+            video_url = result.get('video_url')
+            square_crop = (aspect_ratio == "1:1")
+
+            if square_crop:
+                print("   - 最初0.3秒をカット")
+                print("   - 中央を正方形にクロップ")
+            else:
+                print("   - 最初0.3秒をカット")
+
+            trimmed_video_data = self.trim_video(
+                video_url,
+                start_time=0.3,
+                square_crop=square_crop
+            )
+
+            return {
+                'video_data': trimmed_video_data,
+                'status': 'success',
+                'trimmed': True
+            }
+        except Exception as e:
+            logger.error(f"❌ Video trimming failed: {str(e)}")
+            raise VideoGenerationError(f"Failed to trim video: {str(e)}")
