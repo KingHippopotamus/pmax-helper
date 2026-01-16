@@ -24,7 +24,8 @@ class VideoGenerator:
         image_data: bytes,
         prompt: str,
         duration: int = 4,
-        aspect_ratio: str = "16:9"
+        aspect_ratio: str = "16:9",
+        max_retries: int = 1
     ) -> Dict[str, any]:
         """
         画像から動画を生成 (Sora 2使用)
@@ -34,6 +35,7 @@ class VideoGenerator:
             prompt: 動画生成のプロンプト（必須）
             duration: 動画の長さ（4, 8, または 12秒）
             aspect_ratio: アスペクト比（"16:9" または "9:16"）
+            max_retries: コンテンツポリシー違反時の最大リトライ回数（デフォルト: 1）
 
         Returns:
             {
@@ -41,64 +43,84 @@ class VideoGenerator:
                 'status': str
             }
         """
-        try:
-            # 画像をアップロード
-            image_url = self._upload_image(image_data)
+        # 画像を1回だけアップロード（リトライ時に再利用）
+        image_url = self._upload_image(image_data)
 
-            # fal-ai/sora-2/image-to-video を呼び出し
-            # FAL_KEY は環境変数から fal_client が自動的に読み込む
-            model_name = "fal-ai/sora-2/image-to-video/pro"
-            print(f"🎯 使用モデル: {model_name}")
+        # リトライループ
+        for attempt in range(max_retries):
+            try:
+                # fal-ai/sora-2/image-to-video を呼び出し
+                # FAL_KEY は環境変数から fal_client が自動的に読み込む
+                model_name = "fal-ai/sora-2/image-to-video/pro"
 
-            result = fal_client.subscribe(
-                model_name,
-                arguments={
-                    "image_url": image_url,
-                    "prompt": prompt,
-                    "duration": duration,
-                    "resolution": "auto",
-                    "aspect_ratio": aspect_ratio
-                },
-                with_logs=True
-            )
+                if attempt > 0:
+                    print(f"🔄 リトライ {attempt}/{max_retries - 1} 回目...")
+                else:
+                    print(f"🎯 使用モデル: {model_name}")
 
-            print(f"✅ fal-ai result: {result}")
-
-            # 結果から動画URLを取得
-            video_url = result.get('video', {}).get('url')
-
-            if not video_url:
-                raise Exception(f"Video URL not found in response. Full response: {result}")
-
-            return {
-                'video_url': video_url,
-                'status': 'success'
-            }
-
-        except Exception as e:
-            # fal.aiエラーをパース
-            parsed_error = self._parse_fal_error(e)
-            error_type = parsed_error['type']
-            error_msg = parsed_error['msg']
-
-            # エラータイプ別にハンドリング
-            if error_type == 'content_policy_violation':
-                logger.error(f"❌ Content policy violation detected: {error_msg}")
-                raise ContentPolicyViolationError(
-                    "動画生成がコンテンツポリシー違反により拒否されました。\n"
-                    "以下の理由が考えられます:\n"
-                    "・画像に不適切なコンテンツが含まれている可能性\n"
-                    "・プロンプトに不適切な表現が含まれている可能性\n"
-                    "・人物画像の場合、服装や背景が原因の可能性\n\n"
-                    "対処方法:\n"
-                    "・より一般的な画像を使用してください\n"
-                    "・別のキャラクター画像をお試しください\n"
-                    "・プロンプト内容を確認してください"
+                result = fal_client.subscribe(
+                    model_name,
+                    arguments={
+                        "image_url": image_url,
+                        "prompt": prompt,
+                        "duration": duration,
+                        "resolution": "auto",
+                        "aspect_ratio": aspect_ratio
+                    },
+                    with_logs=True
                 )
 
-            # その他のエラー
-            logger.error(f"❌ Video generation failed: {error_msg}")
-            raise VideoGenerationError(f"動画生成に失敗しました: {error_msg}")
+                print(f"✅ fal-ai result: {result}")
+
+                # 結果から動画URLを取得
+                video_url = result.get('video', {}).get('url')
+
+                if not video_url:
+                    raise Exception(f"Video URL not found in response. Full response: {result}")
+
+                if attempt > 0:
+                    print(f"✅ リトライ成功！（{attempt + 1}回目の試行で成功）")
+
+                return {
+                    'video_url': video_url,
+                    'status': 'success'
+                }
+
+            except Exception as e:
+                # fal.aiエラーをパース
+                parsed_error = self._parse_fal_error(e)
+                error_type = parsed_error['type']
+                error_msg = parsed_error['msg']
+
+                # エラータイプ別にハンドリング
+                if error_type == 'content_policy_violation':
+                    logger.error(f"❌ Content policy violation detected (attempt {attempt + 1}/{max_retries}): {error_msg}")
+
+                    # 最後の試行でもエラーの場合は例外を投げる
+                    if attempt == max_retries - 1:
+                        logger.error(f"❌ {max_retries}回のリトライ後もコンテンツポリシー違反エラーが継続")
+                        raise ContentPolicyViolationError(
+                            f"動画生成がコンテンツポリシー違反により拒否されました（{max_retries}回試行）。\n"
+                            "以下の理由が考えられます:\n"
+                            "・画像に不適切なコンテンツが含まれている可能性\n"
+                            "・プロンプトに不適切な表現が含まれている可能性\n"
+                            "・人物画像の場合、服装や背景が原因の可能性\n\n"
+                            "対処方法:\n"
+                            "・より一般的な画像を使用してください\n"
+                            "・別のキャラクター画像をお試しください\n"
+                            "・プロンプト内容を確認してください"
+                        )
+
+                    # まだリトライ可能な場合は次のループへ
+                    print(f"⚠️ コンテンツポリシー違反を検出。リトライします... ({attempt + 1}/{max_retries})")
+                    continue
+
+                # その他のエラー（リトライしない）
+                logger.error(f"❌ Video generation failed: {error_msg}")
+                raise VideoGenerationError(f"動画生成に失敗しました: {error_msg}")
+
+        # ここには到達しないはずだが、念のため
+        raise VideoGenerationError("予期しないエラー: リトライループが完了しましたが結果がありません")
 
     def _parse_fal_error(self, exception: Exception) -> dict:
         """
