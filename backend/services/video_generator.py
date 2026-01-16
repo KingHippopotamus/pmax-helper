@@ -5,6 +5,8 @@ import logging
 from typing import Dict, Optional
 from io import BytesIO
 from .exceptions import ContentPolicyViolationError, VideoGenerationError
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -452,3 +454,152 @@ class VideoGenerator:
         except Exception as e:
             logger.error(f"❌ Video post-processing failed: {str(e)}")
             raise VideoGenerationError(f"動画の後処理に失敗しました: {str(e)}")
+
+    def generate_character_video_batch(
+        self,
+        image_data: bytes,
+        prompt: Optional[str] = None,
+        max_workers: int = 5
+    ) -> Dict[str, any]:
+        """
+        キャラクター動画を5本並列生成（縦長×2、横長×2、正方形×1）
+
+        Args:
+            image_data: キャラクター画像のバイトデータ
+            prompt: カスタムプロンプト（未指定の場合はデフォルト使用）
+            max_workers: 並列実行のスレッド数（デフォルト: 5）
+
+        Returns:
+            {
+                'videos': [
+                    {'aspect_ratio': '9:16', 'video_data': bytes, 'status': 'success', 'index': 0, 'name': '縦長1'},
+                    ...
+                ],
+                'summary': {
+                    'total': 5,
+                    'success': 4,
+                    'failed': 1,
+                    'errors': ['動画3でエラー: ...']
+                }
+            }
+        """
+        # デフォルトプロンプト
+        if not prompt:
+            prompt = "Make this character dance with lively and fun movements. Add energetic body language and natural motion."
+
+        # 生成する動画の仕様
+        video_specs = [
+            {'aspect_ratio': '9:16', 'index': 0, 'name': '縦長1'},
+            {'aspect_ratio': '9:16', 'index': 1, 'name': '縦長2'},
+            {'aspect_ratio': '16:9', 'index': 2, 'name': '横長1'},
+            {'aspect_ratio': '16:9', 'index': 3, 'name': '横長2'},
+            {'aspect_ratio': '1:1', 'index': 4, 'name': '正方形'},
+        ]
+
+        print(f"🚀 バッチ動画生成を開始します（5本並列）")
+        print(f"   予想処理時間: 2-5分\n")
+
+        # 結果格納
+        results = [None] * 5
+        errors = []
+
+        # 並列実行用の関数
+        def generate_single_video(spec):
+            """単一動画を生成（スレッドセーフ）"""
+            index = spec['index']
+            aspect_ratio = spec['aspect_ratio']
+            name = spec['name']
+
+            try:
+                print(f"[{name}] 生成開始... (アスペクト比: {aspect_ratio})")
+                start_time = time.time()
+
+                # 既存メソッドを呼び出し
+                result = self.generate_character_video(
+                    image_data=image_data,
+                    prompt=prompt,
+                    aspect_ratio=aspect_ratio
+                )
+
+                elapsed = time.time() - start_time
+                print(f"[{name}] ✅ 完了 ({elapsed:.1f}秒)")
+
+                return {
+                    'index': index,
+                    'aspect_ratio': aspect_ratio,
+                    'name': name,
+                    'video_data': result.get('video_data'),
+                    'status': 'success',
+                    'trimmed': result.get('trimmed', False),
+                    'elapsed_time': elapsed
+                }
+
+            except ContentPolicyViolationError as e:
+                error_msg = f"[{name}] コンテンツポリシー違反: {str(e)}"
+                print(f"❌ {error_msg}")
+                logger.error(error_msg)
+                return {
+                    'index': index,
+                    'aspect_ratio': aspect_ratio,
+                    'name': name,
+                    'status': 'error',
+                    'error': str(e),
+                    'error_type': 'content_policy_violation'
+                }
+
+            except Exception as e:
+                error_msg = f"[{name}] エラー: {str(e)}"
+                print(f"❌ {error_msg}")
+                logger.error(error_msg)
+                return {
+                    'index': index,
+                    'aspect_ratio': aspect_ratio,
+                    'name': name,
+                    'status': 'error',
+                    'error': str(e),
+                    'error_type': 'generation_error'
+                }
+
+        # ThreadPoolExecutor で並列実行
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # すべてのタスクを投入
+            future_to_spec = {
+                executor.submit(generate_single_video, spec): spec
+                for spec in video_specs
+            }
+
+            # 完了したものから処理
+            for future in as_completed(future_to_spec):
+                result = future.result()
+                index = result['index']
+                results[index] = result
+
+                # エラーを記録
+                if result['status'] == 'error':
+                    errors.append(f"{result['name']}: {result['error']}")
+
+        # 成功/失敗の集計
+        success_count = sum(1 for r in results if r and r['status'] == 'success')
+        failed_count = len(errors)
+
+        print(f"\n{'='*60}")
+        print(f"📊 バッチ生成結果")
+        print(f"{'='*60}")
+        print(f"✅ 成功: {success_count}/5")
+        print(f"❌ 失敗: {failed_count}/5")
+
+        if errors:
+            print(f"\n⚠️ エラー詳細:")
+            for error in errors:
+                print(f"   - {error}")
+
+        # 完了
+        return {
+            'videos': results,
+            'summary': {
+                'total': 5,
+                'success': success_count,
+                'failed': failed_count,
+                'errors': errors
+            }
+        }
