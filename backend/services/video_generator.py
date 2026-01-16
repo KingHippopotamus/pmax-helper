@@ -376,8 +376,8 @@ class VideoGenerator:
         if not prompt:
             prompt = "Make this character dance with lively and fun movements. Add energetic body language and natural motion."
 
-        # 1:1の場合も16:9で生成（変更点）
-        actual_ratio = aspect_ratio if aspect_ratio != "1:1" else "16:9"
+        # 1:1の場合は9:16で生成
+        actual_ratio = "9:16" if aspect_ratio == "1:1" else aspect_ratio
 
         # 動画生成
         result = self.generate_video_from_image(
@@ -395,17 +395,21 @@ class VideoGenerator:
         # ポストプロセス
         try:
             if aspect_ratio == "1:1":
-                # 1:1の場合: 横長動画の上下にレターボックスを追加
-                print("✂️ 動画を処理中...")
+                # 1:1の場合: 縦長動画の中央を正方形にクロップ
+                print("✂️ 動画をトリミング中...")
                 print("   - 最初0.3秒をカット")
-                print("   - 上下に黒い背景を追加して正方形に変換")
+                print("   - 中央を正方形にクロップ")
 
-                video_data = self.add_letterbox_to_square(video_url, start_time=0.3)
+                trimmed_video_data = self.trim_video(
+                    video_url,
+                    start_time=0.3,
+                    square_crop=True
+                )
 
                 return {
-                    'video_data': video_data,
+                    'video_data': trimmed_video_data,
                     'status': 'success',
-                    'processed': True
+                    'trimmed': True
                 }
             else:
                 # 16:9, 9:16の場合: 最初0.3秒のみトリミング
